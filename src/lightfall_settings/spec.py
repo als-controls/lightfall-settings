@@ -57,8 +57,23 @@ class SettingSpec:
     restart_required: bool = False
 
     def __post_init__(self) -> None:
-        if not self.key:
-            raise ValueError("SettingSpec.key must not be empty")
+        if not isinstance(self.key, str) or not self.key:
+            raise ValueError("SettingSpec.key must be a non-empty string")
+        for name in ("subtractable", "operator_writable", "lockable", "restart_required"):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{self.key}: {name} must be true or false")
+        for name in ("label", "page"):
+            if not isinstance(getattr(self, name), str):
+                raise ValueError(f"{self.key}: {name} must be a string")
+        if isinstance(self.scopes, str) or not all(isinstance(k, str) for k in self.scopes):
+            raise ValueError(f"{self.key}: scopes must be a list of scope kinds")
+        if not isinstance(self.write_role, (str, Mapping)) or (
+            isinstance(self.write_role, Mapping)
+            and not all(isinstance(v, str) for v in self.write_role.values())
+        ):
+            raise ValueError(f"{self.key}: write_role must be a role or a kind -> role map")
+        if not isinstance(self.policy, str):
+            raise ValueError(f"{self.key}: policy must be a string")
         scopes = frozenset(self.scopes)
         object.__setattr__(self, "scopes", scopes)
         if not scopes:
@@ -165,6 +180,16 @@ def spec_to_dict(spec: SettingSpec) -> dict[str, Any]:
 
 
 def spec_from_dict(d: Mapping[str, Any]) -> SettingSpec:
+    """Build a spec from untrusted JSON. Raises ``ValueError`` for anything malformed."""
+    if not isinstance(d, Mapping):
+        raise ValueError("spec must be an object")
+    try:
+        return _spec_from_dict(d)
+    except TypeError as e:  # wrong JSON types (lists, numbers) where scalars belong
+        raise ValueError(f"malformed spec: {e}") from None
+
+
+def _spec_from_dict(d: Mapping[str, Any]) -> SettingSpec:
     bad = set(d) - _SPEC_FIELDS
     if bad:
         raise ValueError(f"unknown spec fields {sorted(bad)}")
@@ -172,10 +197,12 @@ def spec_from_dict(d: Mapping[str, Any]) -> SettingSpec:
         raise ValueError("spec is missing 'key'")
     data = dict(d)
     tname = data.pop("type", "any")
-    if tname not in TYPE_NAMES:
+    if not isinstance(tname, str) or tname not in TYPE_NAMES:
         raise ValueError(f"unknown spec type {tname!r}")
     data["type"] = TYPE_NAMES[tname]
     if "scopes" in data:
+        if isinstance(data["scopes"], str):
+            raise ValueError("scopes must be a list of scope kinds")
         data["scopes"] = frozenset(data["scopes"])
     try:
         json.dumps(data.get("default"))

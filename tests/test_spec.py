@@ -174,7 +174,11 @@ def test_spec_from_dict_defaults_missing_fields():
 @pytest.mark.parametrize(
     "d",
     [{"key": "a", "type": "complex"}, {"key": "a", "colour": "red"},
-     {"key": "a", "default": object()}, {"key": "a", "scopes": ["galaxy"]}, {"type": "str"}],
+     {"key": "a", "default": object()}, {"key": "a", "scopes": ["galaxy"]}, {"type": "str"},
+     {"key": "a", "operator_writable": "false"}, {"key": "a", "lockable": 0},
+     {"key": "a", "type": ["x"]}, {"key": "a", "scopes": 5},
+     {"key": "a", "write_role": ["admin"]}, {"key": "a", "write_role": {"beamline": ["a"]}},
+     {"key": "a", "policy": []}, {"key": "a", "label": 5}, {"key": 5}, 5, ["key"]],
 )
 def test_spec_from_dict_rejects(d):
     with pytest.raises(ValueError):
@@ -196,3 +200,10 @@ def test_strict_float_still_accepts_int():
 def test_overridable_fields_is_public():
     from lightfall_settings import OVERRIDABLE_FIELDS
     assert "operator_writable" in OVERRIDABLE_FIELDS and "type" not in OVERRIDABLE_FIELDS
+
+
+@pytest.mark.parametrize("field", ["subtractable", "operator_writable", "lockable",
+                                   "restart_required"])
+def test_bool_fields_must_be_bool(field):
+    with pytest.raises(ValueError):
+        SettingSpec("k", scopes=ALL_KINDS, **{field: "false"})
