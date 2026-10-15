@@ -6,6 +6,7 @@ from lightfall_settings.roles import (
     role_at_least,
     role_on,
     roles_for_chain,
+    validate_facility_grants,
 )
 from lightfall_settings.scopes import FACILITY, ScopeChain, ScopeId
 
@@ -48,11 +49,6 @@ def test_user_scope_never_gets_a_group_role():
     assert role_on(USER, CHAIN, ["/beamlines/_all/admin", "/BCG_staff"]) is None
 
 
-def test_branch_grant_without_beamline_in_chain_matches_by_branch_name():
-    chain = ScopeChain.of("facility", "branch:7.0.1.1")
-    assert role_on(BR, chain, ["/beamlines/7.0.1/branch/7.0.1.1/maintainer"]) == "maintainer"
-
-
 def test_custom_facility_grants():
     grants = {"/lightfall_facility_admin": "admin"}
     assert role_on(FACILITY, CHAIN, ["/lightfall_facility_admin"], grants) == "admin"
@@ -79,3 +75,20 @@ def test_role_ranking():
 def test_normalize_group():
     assert normalize_group(" beamlines/7.0.1/admin/ ") == "/beamlines/7.0.1/admin"
     assert normalize_group("/") == ""
+
+
+def test_non_string_groups_are_ignored():
+    assert role_on(BL, CHAIN, [None, 5, "/beamlines/7.0.1/viewer"]) == "viewer"
+    assert normalize_group(None) == ""
+
+
+def test_bad_facility_grant_values_are_ignored_by_role_on():
+    assert role_on(FACILITY, CHAIN, ["/x"], {"/x": "superuser"}) is None
+
+
+def test_validate_facility_grants():
+    assert validate_facility_grants({"BCG_staff/": "maintainer"}) == {"/BCG_staff": "maintainer"}
+    with pytest.raises(ValueError):
+        validate_facility_grants({"/x": "superuser"})
+    with pytest.raises(ValueError):
+        validate_facility_grants({"": "admin"})

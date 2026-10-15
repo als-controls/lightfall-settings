@@ -58,6 +58,10 @@ def check_write(
     value: Any = None,
     facility_grants: Mapping[str, ScopeRole] = DEFAULT_FACILITY_GRANTS,
 ) -> Any:
+    """Check one write. ``snapshots`` must include every scope in ``chain`` that
+    has data for ``spec.key`` (in practice: load all of them) -- a lock in a scope
+    missing from ``snapshots`` is invisible here. Returns the validated value
+    for ``set``."""
     if target not in chain:
         raise WriteDenied(404, f"{target} is not in the session's scope chain")
 

@@ -21,7 +21,7 @@ from lightfall_settings.scopes import ALL_KINDS
 
 Policy = Literal["override", "union"]
 _POLICIES = frozenset(get_args(Policy))
-_OVERRIDABLE_FIELDS = frozenset(
+OVERRIDABLE_FIELDS = frozenset(
     {"scopes", "write_role", "operator_writable", "lockable", "subtractable"}
 )
 
@@ -40,6 +40,9 @@ def _adapter(tp: Any) -> TypeAdapter:
 
 @dataclass(frozen=True)
 class SettingSpec:
+    """One setting key's rules. ``operator_writable=True`` takes precedence over
+    ``write_role``: operators (and above) may then write it at every allowed scope."""
+
     key: str
     type: Any = object
     default: Any = None
@@ -76,6 +79,8 @@ class SettingSpec:
                 raise ValueError(f"{self.key}: write_role for unknown scope kind {kind!r}")
             if role not in ROLE_RANK:
                 raise ValueError(f"{self.key}: unknown role {role!r}")
+            if ROLE_RANK[role] < ROLE_RANK["operator"]:
+                raise ValueError(f"{self.key}: write_role {role!r} is below operator")
 
     def allows(self, kind: str) -> bool:
         return kind in self.scopes
@@ -90,7 +95,7 @@ class SettingSpec:
 
     def _validate_item(self, value: Any) -> Any:
         try:
-            return _adapter(self.type).validate_python(value)
+            return _adapter(self.type).validate_python(value, strict=True)
         except ValidationError as e:
             raise ValueError(f"{self.key}: {e.errors()[0]['msg']}") from None
 
@@ -206,7 +211,7 @@ class SpecRegistry:
     def apply_overrides(self, overrides: Mapping[str, Mapping[str, Any]]) -> None:
         """Loosen or restrict rule fields of keys (admin edits before approving)."""
         for key, fields in overrides.items():
-            bad = set(fields) - _OVERRIDABLE_FIELDS
+            bad = set(fields) - OVERRIDABLE_FIELDS
             if bad:
                 raise ValueError(f"{key}: fields {sorted(bad)} cannot be overridden")
             changes = dict(fields)

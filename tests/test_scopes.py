@@ -15,7 +15,7 @@ def test_parse_round_trip(text):
 @pytest.mark.parametrize(
     "bad",
     ["", "facility:als", "beamline:", "bogus:x", "branch:a b", "beamline:a/b",
-     "user:x:y", "beamline:_all", "branch:_all"],
+     "user:x:y", "beamline:_all", "branch:_all", "beamline:..", "user:.", "branch:..."],
 )
 def test_parse_rejects_bad(bad):
     with pytest.raises(ValueError):
@@ -51,7 +51,8 @@ def test_short_chains_are_valid(items):
 @pytest.mark.parametrize(
     "items",
     [(), ("beamline:7.0.1",), ("facility", "branch:x", "beamline:y"),
-     ("facility", "beamline:a", "beamline:b"), ("facility", "user:a", "branch:b")],
+     ("facility", "beamline:a", "beamline:b"), ("facility", "user:a", "branch:b"),
+     ("facility", "branch:7.0.1.1"), ("facility", "branch:7.0.1.1", "user:a")],
 )
 def test_bad_chains_rejected(items):
     with pytest.raises(ValueError):
