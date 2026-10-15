@@ -7,6 +7,8 @@ name = "lightfall-settings"
 dynamic = ["version"]
 description = "Scoped settings model for Lightfall: scopes, scope roles, setting specs, resolution and write rules"
 readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.md", "LEGAL.md"]
 requires-python = ">=3.11"
 dependencies = ["pydantic>=2.0"]
 

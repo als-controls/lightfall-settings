@@ -18,3 +18,7 @@ No Qt, no HTTP. Depends only on pydantic.
 
     ../lightfall/.venv/Scripts/python -m pytest
     ../lightfall/.venv/Scripts/python -m ruff check .
+
+## License
+
+BSD-3-Clause; see [LICENSE.md](LICENSE.md) and [LEGAL.md](LEGAL.md).
