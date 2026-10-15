@@ -30,14 +30,29 @@ DEFAULT_FACILITY_GRANTS: Mapping[str, ScopeRole] = {
 }
 
 
-def normalize_group(path: str) -> str:
-    """``" beamlines/x/admin/ "`` -> ``"/beamlines/x/admin"``; empty stays empty."""
+def normalize_group(path: object) -> str:
+    """``" beamlines/x/admin/ "`` -> ``"/beamlines/x/admin"``; empty/non-str -> ``""``."""
+    if not isinstance(path, str):
+        return ""
     stripped = path.strip().strip("/")
     return f"/{stripped}" if stripped else ""
 
 
 def role_at_least(role: ScopeRole | None, needed: ScopeRole) -> bool:
     return role is not None and ROLE_RANK[role] >= ROLE_RANK[needed]
+
+
+def validate_facility_grants(grants: Mapping[str, str]) -> dict[str, ScopeRole]:
+    """Normalize group keys and check every value is a scope role."""
+    out: dict[str, ScopeRole] = {}
+    for group, role in grants.items():
+        key = normalize_group(group)
+        if not key:
+            raise ValueError(f"invalid facility grant group {group!r}")
+        if role not in ROLE_RANK:
+            raise ValueError(f"facility grant {group!r}: unknown role {role!r}")
+        out[key] = role  # type: ignore[assignment]
+    return out
 
 
 def _max_role(a: ScopeRole | None, b: ScopeRole) -> ScopeRole:
@@ -58,7 +73,7 @@ def _beamline_grant(parts: list[str], scope: ScopeId, parent_bl: str | None) -> 
         _, bl, _, br, role = parts
         if role not in _ROLES or scope.kind != "branch" or br != scope.name:
             return None
-        if parent_bl is None or bl in (parent_bl, _ALL):
+        if parent_bl is not None and bl in (parent_bl, _ALL):
             return role  # type: ignore[return-value]
     return None
 
@@ -77,12 +92,14 @@ def role_on(
     if scope.kind == "facility":
         grants = {normalize_group(k): v for k, v in facility_grants.items()}
         for g in normalized:
-            if g in grants:
+            if g and grants.get(g) in ROLE_RANK:
                 best = _max_role(best, grants[g])
         return best
     parent = chain.beamline
     parent_bl = parent.name if parent is not None else None
     for g in normalized:
+        if not g:
+            continue
         parts = g.strip("/").split("/")
         if not parts or parts[0] != "beamlines":
             continue

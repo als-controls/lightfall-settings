@@ -51,6 +51,8 @@ def test_required_role():
         {"key": "a", "write_role": {"beamline": "superuser"}},
         {"key": "a", "write_role": {"galaxy": "admin"}},
         {"key": "a", "policy": "append"},
+        {"key": "a", "write_role": "viewer"},
+        {"key": "a", "write_role": {"branch": "viewer"}},
     ],
 )
 def test_invalid_specs_rejected(kwargs):
@@ -177,3 +179,20 @@ def test_spec_from_dict_defaults_missing_fields():
 def test_spec_from_dict_rejects(d):
     with pytest.raises(ValueError):
         spec_from_dict(d)
+
+
+@pytest.mark.parametrize(
+    ("tp", "bad"), [(int, "5"), (bool, "yes"), (str, 5), (list[str], "a,b"), (int, True)]
+)
+def test_validation_is_strict(tp, bad):
+    with pytest.raises(ValueError):
+        SettingSpec("k", type=tp).validate(bad)
+
+
+def test_strict_float_still_accepts_int():
+    assert SettingSpec("k", type=float).validate(1) == 1.0
+
+
+def test_overridable_fields_is_public():
+    from lightfall_settings import OVERRIDABLE_FIELDS
+    assert "operator_writable" in OVERRIDABLE_FIELDS and "type" not in OVERRIDABLE_FIELDS

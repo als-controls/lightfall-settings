@@ -38,6 +38,8 @@ class ScopeId:
             raise ValueError(f"invalid {self.kind} scope name {self.name!r}")
         if self.name in _RESERVED_NAMES:
             raise ValueError(f"{self.name!r} is reserved and cannot name a scope")
+        if set(self.name) == {"."}:
+            raise ValueError(f"{self.name!r} cannot name a scope")
 
     def __str__(self) -> str:
         return "facility" if self.kind == "facility" else f"{self.kind}:{self.name}"
@@ -72,6 +74,9 @@ class ScopeChain:
                 "scope chain must be strictly broad -> specific: "
                 + ", ".join(str(s) for s in self.scopes)
             )
+        kinds = {s.kind for s in self.scopes}
+        if "branch" in kinds and "beamline" not in kinds:
+            raise ValueError("a branch scope needs its beamline in the chain")
 
     @classmethod
     def of(cls, *items: str | ScopeId) -> ScopeChain:
