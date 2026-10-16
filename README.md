@@ -14,6 +14,10 @@ logbook server so both compute identical answers.
 
 No Qt, no HTTP. Depends only on pydantic.
 
+## Install
+
+    pip install lightfall-settings
+
 ## Development
 
     ../lightfall/.venv/Scripts/python -m pytest

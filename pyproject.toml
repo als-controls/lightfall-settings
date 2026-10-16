@@ -10,7 +10,18 @@ readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE.md", "LEGAL.md"]
 requires-python = ">=3.11"
+authors = [{ name = "ALS Controls Team" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Typing :: Typed",
+]
 dependencies = ["pydantic>=2.0"]
+
+[project.urls]
+Homepage = "https://github.com/als-controls/lightfall-settings"
+Source = "https://github.com/als-controls/lightfall-settings"
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
