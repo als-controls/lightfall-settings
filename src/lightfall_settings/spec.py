@@ -24,6 +24,9 @@ _POLICIES = frozenset(get_args(Policy))
 OVERRIDABLE_FIELDS = frozenset(
     {"scopes", "write_role", "operator_writable", "lockable", "subtractable"}
 )
+# A public key's facility value is served without auth (lightfall-logbook's
+# /.well-known/lightfall), so no key containing one of these may be public.
+SECRET_MARKERS: tuple[str, ...] = ("api_key", "token", "secret", "password")
 
 
 @lru_cache(maxsize=256)
@@ -41,7 +44,9 @@ def _adapter(tp: Any) -> TypeAdapter:
 @dataclass(frozen=True)
 class SettingSpec:
     """One setting key's rules. ``operator_writable=True`` takes precedence over
-    ``write_role``: operators (and above) may then write it at every allowed scope."""
+    ``write_role``: operators (and above) may then write it at every allowed scope.
+    ``public=True`` publishes the key's facility value, without auth, in the server's
+    ``/.well-known/lightfall`` bootstrap; secret-like keys can never be public."""
 
     key: str
     type: Any = object
@@ -55,13 +60,17 @@ class SettingSpec:
     label: str = ""
     page: str = ""
     restart_required: bool = False
+    public: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, str) or not self.key:
             raise ValueError("SettingSpec.key must be a non-empty string")
-        for name in ("subtractable", "operator_writable", "lockable", "restart_required"):
+        for name in ("subtractable", "operator_writable", "lockable", "restart_required",
+                     "public"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{self.key}: {name} must be true or false")
+        if self.public and any(marker in self.key.lower() for marker in SECRET_MARKERS):
+            raise ValueError(f"{self.key}: a secret-like key cannot be public")
         for name in ("label", "page"):
             if not isinstance(getattr(self, name), str):
                 raise ValueError(f"{self.key}: {name} must be a string")
@@ -176,6 +185,7 @@ def spec_to_dict(spec: SettingSpec) -> dict[str, Any]:
         "label": spec.label,
         "page": spec.page,
         "restart_required": spec.restart_required,
+        "public": spec.public,
     }
 
 
@@ -247,6 +257,19 @@ class SpecRegistry:
             self._specs[key] = dataclasses.replace(self.get(key), **changes)
 
 
+_FACILITY_ONLY = frozenset({"facility"})
+
+
+def _public_facility(key: str, tp: Any, label: str) -> SettingSpec:
+    return SettingSpec(key=key, type=tp, scopes=_FACILITY_ONLY, public=True, label=label,
+                       page="facility")
+
+
+def _public_service(key: str, label: str) -> SettingSpec:
+    return SettingSpec(key=key, type=str, scopes=ALL_KINDS, public=True, label=label,
+                       page="services")
+
+
 CORE_SPECS: tuple[SettingSpec, ...] = (
     SettingSpec(
         key="plugins.enabled",
@@ -258,6 +281,20 @@ CORE_SPECS: tuple[SettingSpec, ...] = (
         label="Enabled plugins",
         page="plugins",
     ),
+    # Facility bootstrap (lightfall setup wizard): served by /.well-known/lightfall.
+    _public_facility("auth.provider", str, "Sign-on provider"),
+    _public_facility("auth.server_url", str, "Sign-on server URL"),
+    _public_facility("auth.realm", str, "Sign-on realm"),
+    _public_facility("auth.client_id", str, "Sign-on client ID"),
+    _public_facility(
+        "facility.proxy_domains", list[str], "Hosts reached through a SOCKS proxy off-site"
+    ),
+    _public_facility("agent.backend", str, "Assistant backend"),
+    _public_facility("agent.agy_gcp_project", str, "Gemini (agy) GCP project"),
+    _public_facility("agent.agy_gcp_location", str, "Gemini (agy) GCP location"),
+    _public_service("tiled_url", "Tiled server URL"),
+    _public_service("logbook_url", "Logbook server URL"),
+    _public_service("ipc_nats_url", "NATS server URL"),
 )
 
 
