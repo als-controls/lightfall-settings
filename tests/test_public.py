@@ -90,3 +90,32 @@ def test_spec_from_dict_rejects_a_public_secret():
 
 def test_spec_from_dict_without_public_defaults_false():
     assert spec_from_dict({"key": "k"}).public is False
+
+
+# Fields lightfall-settings 0.1.2 knows; it rejects any other ("unknown spec fields").
+FIELDS_0_1_2 = frozenset({
+    "key", "type", "default", "scopes", "policy", "subtractable", "write_role",
+    "operator_writable", "lockable", "label", "page", "restart_required",
+})
+
+
+def test_non_public_spec_dict_has_no_public_key():
+    d = spec_to_dict(SettingSpec("theme", type=str))
+    assert "public" not in d
+    assert set(d) == FIELDS_0_1_2
+    assert spec_from_dict(d).public is False
+
+
+def test_public_spec_dict_carries_public_true():
+    d = spec_to_dict(SettingSpec("auth.realm", type=str, scopes={"facility"}, public=True))
+    assert d["public"] is True
+    assert set(d) == FIELDS_0_1_2 | {"public"}
+
+
+def test_every_core_spec_round_trips():
+    from lightfall_settings import CORE_SPECS
+
+    for spec in CORE_SPECS:
+        d = spec_to_dict(spec)
+        assert ("public" in d) is spec.public, spec.key
+        assert spec_from_dict(d) == spec, spec.key

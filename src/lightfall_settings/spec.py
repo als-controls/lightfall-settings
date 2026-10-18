@@ -172,7 +172,7 @@ def spec_to_dict(spec: SettingSpec) -> dict[str, Any]:
     write_role = (
         dict(spec.write_role) if isinstance(spec.write_role, Mapping) else spec.write_role
     )
-    return {
+    out: dict[str, Any] = {
         "key": spec.key,
         "type": type_name(spec.type),
         "default": spec.default,
@@ -185,8 +185,12 @@ def spec_to_dict(spec: SettingSpec) -> dict[str, Any]:
         "label": spec.label,
         "page": spec.page,
         "restart_required": spec.restart_required,
-        "public": spec.public,
     }
+    # Only when True: lightfall-settings 0.1.2 rejects unknown fields, and an absent
+    # "public" reads back as False.
+    if spec.public:
+        out["public"] = True
+    return out
 
 
 def spec_from_dict(d: Mapping[str, Any]) -> SettingSpec:
