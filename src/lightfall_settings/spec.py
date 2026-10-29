@@ -306,3 +306,39 @@ def core_registry(fallback: Callable[[str], SettingSpec] = user_only_spec) -> Sp
     reg = SpecRegistry(fallback=fallback)
     reg.register_all(CORE_SPECS)
     return reg
+
+
+_BEAMLINE_ONLY = frozenset({"beamline", "branch"})
+_BEAMLINE_AND_USER = frozenset({"beamline", "branch", "user"})
+
+
+def _deployment_identity(key: str, label: str) -> SettingSpec:
+    # Which beamline a console is: a user-scope value would follow the account to
+    # another beamline's console and outrank it, so user scope is not allowed.
+    return SettingSpec(key=key, type=str, scopes=_BEAMLINE_ONLY, label=label)
+
+
+def _device_rows(key: str, tp: Any, label: str) -> SettingSpec:
+    # Union keyed by row id: branch and user rows add to the beamline's, and may
+    # override a row per item (e.g. enabled=False), but never remove one.
+    return SettingSpec(key=key, type=tp, scopes=_BEAMLINE_AND_USER, policy="union",
+                       label=label, page="devices")
+
+
+# What a beamline console is and talks to. Separate from CORE_SPECS because
+# device_backends changes shape (list -> {row id: row}): the logbook enforces these
+# now, and a client opts in with deployment_registry() once it reads the union shape.
+DEPLOYMENT_SPECS: tuple[SettingSpec, ...] = (
+    _deployment_identity("tiled_beamline", "Tiled beamline catalog"),
+    _deployment_identity("current_beamline", "Current beamline"),
+    _deployment_identity("ipc_topic_prefix", "IPC topic prefix"),
+    _device_rows("device_backends", dict, "Device backends"),
+    _device_rows("device_backends_exclusive_restore", bool,
+                 "Device backends to re-enable after an exclusive one"),
+)
+
+
+def deployment_registry(fallback: Callable[[str], SettingSpec] = user_only_spec) -> SpecRegistry:
+    reg = core_registry(fallback)
+    reg.register_all(DEPLOYMENT_SPECS)
+    return reg
